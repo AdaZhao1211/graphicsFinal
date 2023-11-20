@@ -1,5 +1,5 @@
-# Ada Zhao Homework 6
-EXE=hw6
+# homework 6 Ada Zhao
+EXE=final
 
 # Main target
 all: $(EXE)
@@ -25,16 +25,20 @@ CLEAN=rm -f $(EXE) *.o *.a
 endif
 
 # Dependencies
-hw6.o: hw6.c CSCIx229.h
+final.o: final.c CSCIx229.h
 fatal.o: fatal.c CSCIx229.h
 errcheck.o: errcheck.c CSCIx229.h
 print.o: print.c CSCIx229.h
 loadtexbmp.o: loadtexbmp.c CSCIx229.h
 loadobj.o: loadobj.c CSCIx229.h
 projection.o: projection.c CSCIx229.h
+helper.o: helper.c CSCIx229.h
+perlin.o: perlin.c CSCIx229.h
+
+
 
 #  Create archive
-CSCIx229.a:fatal.o errcheck.o print.o loadtexbmp.o loadobj.o projection.o
+CSCIx229.a:fatal.o errcheck.o print.o loadtexbmp.o loadobj.o projection.o helper.o perlin.o
 	ar -rcs $@ $^
 
 # Compile rules
@@ -44,7 +48,7 @@ CSCIx229.a:fatal.o errcheck.o print.o loadtexbmp.o loadobj.o projection.o
 	g++ -c $(CFLG)  $<
 
 #  Link
-hw6:hw6.o   CSCIx229.a
+final:final.o   CSCIx229.a
 	gcc $(CFLG) -o $@ $^  $(LIBS)
 
 #  Clean

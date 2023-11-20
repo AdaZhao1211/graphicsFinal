@@ -47,6 +47,7 @@
 #define Cos(th) cos(3.14159265/180*(th))
 #define Sin(th) sin(3.14159265/180*(th))
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -57,6 +58,17 @@ unsigned int LoadTexBMP(const char* file);
 void Project(double fov,double asp,double dim);
 void ErrCheck(const char* where);
 int  LoadOBJ(const char* file);
+void calcNormal(double ax, double ay, double az, 
+               double bx, double by, double bz, 
+               double cx, double cy, double cz);
+void calcTextCord( double x, double y);
+void calcNormal2V(double X0, double Y0, double Z0, double X1, double Y1, double Z1);
+double rawnoise(int n);
+double noise3d(int x, int y, int z, int octave, int seed);
+double interpolate(double a, double b, double x);
+double smooth3d(double x, double y, double z, int octave, int seed);
+double pnoise3d(double x, double y, double z, double persistence, int octaves, int seed);
+
 
 #ifdef __cplusplus
 }

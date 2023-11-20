@@ -4,7 +4,7 @@
 
 //
 //  Load texture from BMP file
-// the point of this, is to load texture to memory for opengl to access
+//
 
 //
 //  Reverse n bytes
@@ -86,7 +86,7 @@ unsigned int LoadTexBMP(const char* file)
    unsigned int texture;
    glGenTextures(1,&texture);
    glBindTexture(GL_TEXTURE_2D,texture);
-   //  Copy image pass a pointer to opengl
+   //  Copy image
    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,dx,dy,0,GL_RGB,GL_UNSIGNED_BYTE,image);
    if (glGetError()) Fatal("Error in glTexImage2D %s %dx%d\n",file,dx,dy);
    //  Scale linearly when image size doesn't match

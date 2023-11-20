@@ -1,21 +1,21 @@
-ex14: Texture Mapping
-
-Willem A. (Vlakkies) Schreuder
-CSCI4229/5229 Fall 2023
-
-
-Demonstrates basic texture mapping.
-
+Homework 6 Texture
+Ada Zhao
 
 Key bindings
-  t          Cycle through tecture maps
-  c          Cycle through colors
-  o          Cycle through objects
-  m          Toggles texture mode between modulate and replace
-  +/-        Change repeat
-  x/X        Move corner left/right
-  y/Y        Move corner up/down
-  a          Toggle axes
+  m          Toggles texture mode (Replace / Modulate)
+  t          Toogles texture on/off
+  a/A        Decrease/increase ambient light
+  d/D        Decrease/increase diffuse light
+  s/S        Decrease/increase specular light
+  e/E        Decrease/increase emitted light
+  n/N        Decrease/increase shininess
+  []         Lower/rise light
+  <>         Move light closer/further
   arrows     Change view angle
   0          Reset view angle
   ESC        Exit
+
+Estimated Time
+3.5 hours
+
+ 
