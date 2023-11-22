@@ -47,6 +47,7 @@ int ntex = 1; // texture switch
 double t;
 
 unsigned int myTexture;
+int skyTexture;
 
 /*
  *  Draw vertex in polar coordinates with normal, for Ball()
@@ -123,48 +124,134 @@ static void hotAirBalloon(double x, double y, double z, double r)
    glPushMatrix();
    glTranslated(x,y,z);
 
-
    // the top part
    for (int th = 15; th<180; th+=5){
       glBegin(GL_QUAD_STRIP);
 
       for (int alpha = 0; alpha <= 360; alpha +=5){
 
-         double hsvColor[3] = {alpha, 0.6, 0.5+th/180/2};
+         double hsvColor[3] = {alpha, 0.6, 0.5};
          GLfloat rgbColor[3];
          hsvToRgb(hsvColor, rgbColor);
-
+         glColor3f(rgbColor[0], rgbColor[1], rgbColor[2]);
          float localR = 1+r* 1/cosh(2.75*(th*M_PI/180 + M_PI_2));
          float higherR = 1+r* 1/cosh(2.75*((th+5)*M_PI/180 + M_PI_2));
          float highestR = 1+r* 1/cosh(2.75*((th+10)*M_PI/180 + M_PI_2));
-         glColor3f(rgbColor[0], rgbColor[1], rgbColor[2]);
          GLdouble localX = localR*Sin(th)*Cos(alpha);
          GLdouble localY = -localR*Cos(th);
          GLdouble localZ = localR*Sin(th)*Sin(alpha);
          GLdouble higherX = higherR*Sin(th+5)*Cos(alpha);
          GLdouble higherY = -higherR*Cos(th+5);
          GLdouble higherZ = higherR*Sin(th+5)*Sin(alpha);
-
          GLdouble highestX = highestR*Sin(th+10)*Cos(alpha);
          GLdouble highestY = -highestR*Cos(th+10);
          GLdouble highestZ = highestR*Sin(th+10)*Sin(alpha);
 
          calcNormal2V(Sin(alpha), 0, -Cos(alpha), higherX-localX, higherY-localY, higherZ-localZ);
          glVertex3d(localX, localY, localZ);
-
-
          calcNormal2V(Sin(alpha), 0, -Cos(alpha), highestX-higherX, highestY-higherY, highestZ-higherZ);
          glVertex3d(higherX, higherY, higherZ);
       }
       glEnd();
    }
-
-   // strings
-
+   float localR = 1+r* 1/cosh(2.75*(15*M_PI/180 + M_PI_2));
+   GLdouble localY = -localR*Cos(15);
+   glBegin(GL_TRIANGLE_FAN);
+   glColor3f(1, 1, 1);
+   glVertex3d(0, localY, 0);
+   for (int alpha = 0; alpha <= 360; alpha +=5){
+      double hsvColor[3] = {alpha, 0.6, 0.5};
+      GLfloat rgbColor[3];
+      hsvToRgb(hsvColor, rgbColor);
+      glColor3f(rgbColor[0], rgbColor[1], rgbColor[2]);
+      glVertex3d(localR*Sin(15)*Cos(alpha), localY, localR*Sin(15)*Sin(alpha));
+   }
+   glEnd();
+   // 4 strings
+   float stringD = localR*Sin(15)*0.8;
+   float stringR = localR*Sin(15)*0.05;
+   for (int i = 0; i < 4; i++){
+      glBegin(GL_QUAD_STRIP);
+      glColor3f(1, 1, 1);
+      for (int alpha = 0; alpha <= 360; alpha +=45){
+         glNormal3f(Cos(alpha), 0, Sin(alpha));
+         glVertex3d(stringD*Cos(i*90) + stringR*Cos(alpha), localY, stringD*Sin(i*90) + stringR*Sin(alpha));
+         glVertex3d(stringD*Cos(i*90) + stringR*Cos(alpha), localY*1.2, stringD*Sin(i*90) + stringR*Sin(alpha));
+      }
+      glEnd();
+   }
 
    // basket
+   glBegin(GL_QUAD_STRIP);
+   for (int alpha = 0; alpha <= 360; alpha +=15){
+      glColor3f(1, 0.5, 0.7);
+      glNormal3f(Cos(alpha), 0, Sin(alpha));
+      glVertex3d(localR*Sin(15)*Cos(alpha), localY*1.2, localR*Sin(15)*Sin(alpha));
+      glVertex3d(localR*Sin(15)*Cos(alpha), localY*1.4, localR*Sin(15)*Sin(alpha));
+   }
+   glEnd();
+
+   glBegin(GL_TRIANGLE_FAN);
+   glColor3f(1, 1, 1);
+   glNormal3f(0, -1, 0); glVertex3d(0, localY*1.4, 0);
+   for (int alpha = 0; alpha <= 360; alpha +=5){
+      glColor3f(1, 0.5, 0.7);
+      glVertex3d(localR*Sin(15)*Cos(alpha), localY*1.4, localR*Sin(15)*Sin(alpha));
+   }
+   glEnd();
+
+   glPopMatrix();
+}
+
+/* 
+ *  skybox
+ */
+static void Sky(double D)
+{
+   //  Textured white box dimension (-D,+D)
+   glPushMatrix();
+   glScaled(D,D,D);
+   glEnable(GL_TEXTURE_2D);
+   glColor3f(1,1,1);
+
+   //  Sides
+   glBindTexture(GL_TEXTURE_2D,skyTexture);
+   glBegin(GL_QUADS);
+   glTexCoord2f(0.00,0.34); glVertex3f(-1,-1,-1);
+   glTexCoord2f(0.25,0.34); glVertex3f(+1,-1,-1);
+   glTexCoord2f(0.25,0.666); glVertex3f(+1,+1,-1);
+   glTexCoord2f(0.00,0.666); glVertex3f(-1,+1,-1);
+
+   glTexCoord2f(0.25,0.34); glVertex3f(+1,-1,-1);
+   glTexCoord2f(0.50,0.34); glVertex3f(+1,-1,+1);
+   glTexCoord2f(0.50,0.666); glVertex3f(+1,+1,+1);
+   glTexCoord2f(0.25,0.666); glVertex3f(+1,+1,-1);
+
+   glTexCoord2f(0.50,0.34); glVertex3f(+1,-1,+1);
+   glTexCoord2f(0.75,0.34); glVertex3f(-1,-1,+1);
+   glTexCoord2f(0.75,0.666); glVertex3f(-1,+1,+1);
+   glTexCoord2f(0.50,0.666); glVertex3f(+1,+1,+1);
+
+   glTexCoord2f(0.75,0.34); glVertex3f(-1,-1,+1);
+   glTexCoord2f(1.00,0.34); glVertex3f(-1,-1,-1);
+   glTexCoord2f(1.00,0.666); glVertex3f(-1,+1,-1);
+   glTexCoord2f(0.75,0.666); glVertex3f(-1,+1,+1);
 
 
+   //  Top and bottom
+   glTexCoord2f(0.25,0.667); glVertex3f(+1,+1,-1);
+   glTexCoord2f(0.5,0.667); glVertex3f(+1,+1,+1);
+   glTexCoord2f(0.5,1); glVertex3f(-1,+1,+1);
+   glTexCoord2f(0.25,1); glVertex3f(-1,+1,-1);
+
+   glTexCoord2f(0.25,0); glVertex3f(-1,-1,+1);
+   glTexCoord2f(0.5,0); glVertex3f(+1,-1,+1);
+   glTexCoord2f(0.5,0.33); glVertex3f(+1,-1,-1);
+   glTexCoord2f(0.25,0.33); glVertex3f(-1,-1,-1);
+   glEnd();
+
+   //  Undo
+   glDisable(GL_TEXTURE_2D);
    glPopMatrix();
 }
 
@@ -176,17 +263,12 @@ static void water(double x,double y,double z,double s){
       glBegin(GL_QUAD_STRIP);
       for(double j = z-s/2; j <= z+s/2 ; j+=step){
          float perlinY = pnoise3d(i*0.2, j*0.2, t, 0.1, 5, 12124);
-
          glVertex3d(i, y+perlinY, j);
-
          float perlinY1 = pnoise3d((i+step)*0.2, j*0.2, t, 0.1, 5, 12124);
          glVertex3d(i+step, y+perlinY1, j);
-
       }
       glEnd();
    }
-
-
 
 }
 
@@ -458,12 +540,13 @@ void display()
 
    //  Draw individual objects
    drawCar(0,-4,0, 1, 2, 1, 0);
+   Sky(3.5*dim);
 
    glDisable(GL_TEXTURE_2D);
 
    ball(-4,0,0 , 0.5);
-   hotAirBalloon(0,0,0,40);
-   water(0,0,0,10);
+   hotAirBalloon(0,2,0,40);
+   // water(0,0,0,10);
    
    
 
@@ -533,8 +616,6 @@ void special(int key,int x,int y)
    //  Down arrow key - decrease elevation by 5 degrees
    else if (key == GLUT_KEY_DOWN)
       ph += 2;
-
-      
    //  Keep angles to +/-360 degrees
    th %= 360;
    ph %= 360;
@@ -638,7 +719,7 @@ int main(int argc,char* argv[])
    //  Request double buffered, true color window with Z buffering at 600x600
    glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
    glutInitWindowSize(600,400);
-   glutCreateWindow("Ada Zhao HW6 Texture");
+   glutCreateWindow("Ada Zhao Final Project");
 #ifdef USEGLEW
    //  Initialize GLEW
    if (glewInit()!=GLEW_OK) Fatal("Error initializing GLEW\n");
@@ -650,6 +731,7 @@ int main(int argc,char* argv[])
    glutKeyboardFunc(key);
    glutIdleFunc(idle);
    myTexture = LoadTexBMP("Car.bmp");
+   skyTexture = LoadTexBMP("daylight.bmp");
    //  Pass control to GLUT so it can interact with the user
    ErrCheck("init");
    glutMainLoop();
