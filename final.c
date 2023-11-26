@@ -49,6 +49,14 @@ double t;
 unsigned int myTexture;
 int skyTexture;
 
+
+/*  Lorenz Parameters  */
+
+double dt = 0.004;
+double s  = 10;
+double b  = 2.667;
+double r  = 32;
+
 /*
  *  Draw vertex in polar coordinates with normal, for Ball()
  */
@@ -309,6 +317,117 @@ static void ball(double x,double y,double z,double r)
    glPopMatrix();
 }
 
+void CrossProduct(double vect_A[], double vect_B[], double cross_P[]){
+   // vectorc = vectora x vectorb
+   //a*b = (y1z2 - z1y2,z1x2 - x1z2,x1y2 - x2y1)
+   cross_P[0] = vect_A[1] * vect_B[2] - vect_A[2] * vect_B[1];
+   cross_P[1] = vect_A[2] * vect_B[0] - vect_A[0] * vect_B[2];
+   cross_P[2] = vect_A[0] * vect_B[1] - vect_A[1] * vect_B[0];
+}
+
+double dotProduct(double vect_A[], double vect_B[])
+{
+ 
+    double product = 0;
+ 
+    // Loop for calculate dot product
+    for (int i = 0; i < 3; i++)
+ 
+        product = product + vect_A[i] * vect_B[i];
+    return product;
+}
+
+void Normalize(double vect_A[]){
+   // vectorc = vectora x vectorb
+   //a*b = (y1z2 - z1y2,z1x2 - x1z2,x1y2 - x2y1)
+   double norm = sqrt(vect_A[0]*vect_A[0] + vect_A[1] * vect_A[1] + vect_A[2] * vect_A[2]);
+   vect_A[0] /= norm;
+   vect_A[1] /= norm;
+   vect_A[2] /= norm;
+
+}
+
+
+static void lorenz(double posx, double posy, double posz, int steps, double r){
+   // double x = 10;
+   // double y = 10;
+   // double z = 10;
+   double x = 17.569324;
+   double y = 8.994819;
+   double z = 50.353686;
+   GLdouble transformx = posx - x;
+   GLdouble transformy = posy - y;
+   GLdouble transformz = posz - z;   
+
+   glPushMatrix();
+   glTranslated(transformx*0.1,transformy*0.1,transformz*0.1);
+   glColor3f(1, 1, 1);
+
+   for(int i = 0; i < steps; i++){
+      double dx = dt*s*(y-x);
+      double dy = dt*(x*(r-z)-y);
+      double dz = dt*(x*y - b*z);
+      double x1 = x+dx;
+      double y1 = y+dy;
+      double z1 = z+dz;
+      // derivative for x
+      // x1, y1, z1
+      double dv[] = {dx, dy, dz};
+      Normalize(dv);
+      // x2, y2, z2
+      double gravity[] = {0, -1, 0};
+      //a*b = (y1z2 - z1y2,z1x2 - x1z2,x1y2 - x2y1)
+      double perpendicular[3];
+      CrossProduct(dv, gravity, perpendicular);
+      Normalize(perpendicular);
+      double cross_product[3];
+      CrossProduct(dv, perpendicular, cross_product);
+      Normalize(cross_product);
+      double dot_product = dotProduct(dv, perpendicular);
+
+      // derivative for x1  
+      double dx1 = dt*s*(y1-x1);
+      double dy1 = dt*(x1*(r-z1)-y1);
+      double dz1 = dt*(x1*y1 - b*z1);
+      double dv1[] = {dx1, dy1, dz1};
+      Normalize(dv1);
+      double perpendicular1[3];
+      CrossProduct(dv1, gravity, perpendicular1);
+      Normalize(perpendicular1);
+      double cross_product1[3];
+      CrossProduct(dv1, perpendicular1, cross_product1);
+      Normalize(cross_product1);
+      double dot_product1 = dotProduct(dv1, perpendicular1);
+
+
+
+      glBegin(GL_QUAD_STRIP);
+      for(int j = 0; j > -180; j-=30){
+         double b_rotate[] = 
+         {
+            perpendicular[0]*Cos(j) + cross_product[0]*Sin(j)+dv[0]*dot_product*(1-Cos(j)),
+            perpendicular[1]*Cos(j) + cross_product[1]*Sin(j)+dv[1]*dot_product*(1-Cos(j)),
+            perpendicular[2]*Cos(j) + cross_product[2]*Sin(j)+dv[2]*dot_product*(1-Cos(j)),
+         };
+         glVertex3d(x*0.1+b_rotate[0],y*0.1+b_rotate[1],z*0.1+b_rotate[2]);
+         double b_rotate1[] = 
+         {
+            perpendicular1[0]*Cos(j) + cross_product1[0]*Sin(j)+dv1[0]*dot_product1*(1-Cos(j)),
+            perpendicular1[1]*Cos(j) + cross_product1[1]*Sin(j)+dv1[1]*dot_product1*(1-Cos(j)),
+            perpendicular1[2]*Cos(j) + cross_product1[2]*Sin(j)+dv1[2]*dot_product1*(1-Cos(j)),
+         };
+         glVertex3d(x1*0.1+b_rotate1[0],y1*0.1+b_rotate1[1],z1*0.1+b_rotate1[2]);
+      }
+      glEnd();
+      x = x1;
+      y = y1;
+      z = z1;
+   }
+
+
+   glPopMatrix();
+
+}
 
 /*
  *  Draw a car
@@ -546,6 +665,7 @@ void display()
 
    ball(-4,0,0 , 0.5);
    hotAirBalloon(0,2,0,40);
+   lorenz(0.0, 0.0, 0.0, 20, 0.5);
    // water(0,0,0,10);
    
    
