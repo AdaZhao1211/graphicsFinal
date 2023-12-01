@@ -27,7 +27,7 @@ int th=0;         //  Azimuth of view angle
 int ph=0;         //  Elevation of view angle
 int fov=55;       //  Field of view (for perspective)
 double asp=1;     //  Aspect ratio
-double dim=3;     //  Size of world
+double dim=5;     //  Size of world
 // Light values
 int light     =   1;  // Lighting
 int one       =   1;  // Unit value
@@ -46,16 +46,32 @@ float ylight  =   0;  // Elevation of light
 int ntex = 1; // texture switch
 double t;
 
-unsigned int myTexture;
+unsigned int myTexture[3];
+char* textureName[] = {"Car.bmp","daylight.bmp","fence.bmp"};
 int skyTexture;
+static GLfloat fps = -1;
+static GLint T0 = 0;
+static GLint T1 = 0;
+static GLint Frames = 0;
+
+float bally = 2;
+float ballx = 2;
+float ballt = 0;
+
+char* ModelNames[] = {"cactus_medium_A.obj", "Rock_1.obj", "Rock_2.obj", "RockPlatforms_2.obj"};
+int myModels[4];
+
+int rockNumbers = 4;
+typedef struct
+{
+   double x;
+   double y;
+   double z;
+   int style;
+}  Rock;
+Rock rockPosition[4];
 
 
-/*  Lorenz Parameters  */
-
-double dt = 0.004;
-double s  = 10;
-double b  = 2.667;
-double r  = 32;
 
 /*
  *  Draw vertex in polar coordinates with normal, for Ball()
@@ -113,16 +129,15 @@ void hsvToRgb(double hsv[3], GLfloat rgb[3]) {
     rgb[2] += m;
 }
 
+/*
+ *  Draw the hot air balloon
+ */
 static void hotAirBalloon(double x, double y, double z, double r)
 {
-   // float black[]  = {0.0,0.0,0.0,1.0};
    float red[]  = {1.0,0.0,0.0,1.0};
-   // float midred[]  = {1.0,0.4,0.4,1.0};
    float white[]  = {1.0,1.0,1.0,1.0};
-   // float yellow[]  = {1.0,1.0,0.0,1.0};
    float Emission[] = {0.01*emission,0.004*emission,0.004*emission,1.0};
 
-   // glColor4fv(red);
    glMaterialfv(GL_FRONT_AND_BACK,GL_EMISSION,Emission);
    glMaterialfv(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE,red);
    glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR,white);
@@ -188,22 +203,27 @@ static void hotAirBalloon(double x, double y, double z, double r)
       }
       glEnd();
    }
-
    // basket
+   glEnable(GL_TEXTURE_2D);
+   glTexEnvi(GL_TEXTURE_ENV , GL_TEXTURE_ENV_MODE , GL_MODULATE);
+   glBindTexture(GL_TEXTURE_2D,myTexture[2]);
    glBegin(GL_QUAD_STRIP);
    for (int alpha = 0; alpha <= 360; alpha +=15){
       glColor3f(1, 0.5, 0.7);
       glNormal3f(Cos(alpha), 0, Sin(alpha));
+      glTexCoord2f(alpha/45,0);
       glVertex3d(localR*Sin(15)*Cos(alpha), localY*1.2, localR*Sin(15)*Sin(alpha));
+      glTexCoord2f(alpha/45,0.3);
       glVertex3d(localR*Sin(15)*Cos(alpha), localY*1.4, localR*Sin(15)*Sin(alpha));
    }
    glEnd();
+   glDisable(GL_TEXTURE_2D);
+
 
    glBegin(GL_TRIANGLE_FAN);
-   glColor3f(1, 1, 1);
+   glColor3f(1, 0.5, 0.7);
    glNormal3f(0, -1, 0); glVertex3d(0, localY*1.4, 0);
    for (int alpha = 0; alpha <= 360; alpha +=5){
-      glColor3f(1, 0.5, 0.7);
       glVertex3d(localR*Sin(15)*Cos(alpha), localY*1.4, localR*Sin(15)*Sin(alpha));
    }
    glEnd();
@@ -223,7 +243,7 @@ static void Sky(double D)
    glColor3f(1,1,1);
 
    //  Sides
-   glBindTexture(GL_TEXTURE_2D,skyTexture);
+   glBindTexture(GL_TEXTURE_2D,myTexture[1]);
    glBegin(GL_QUADS);
    glTexCoord2f(0.00,0.34); glVertex3f(-1,-1,-1);
    glTexCoord2f(0.25,0.34); glVertex3f(+1,-1,-1);
@@ -265,11 +285,17 @@ static void Sky(double D)
 
 
 static void water(double x,double y,double z,double s){
+   // glEnable(GL_BLEND);
+   // glBlendFunc(GL_SRC_ALPHA,GL_ONE);
+   // glDepthMask(0);
+
+   //glColor4f(0.509,0.914,1, 0.5);
+   glColor3f(0.509,0.914,1);
 
    double step = s/40;
-   for(double i = x-s/2; i < x+s/2 ; i+=step){
+   for(double i = x-s; i < x+s; i+=step){
       glBegin(GL_QUAD_STRIP);
-      for(double j = z-s/2; j <= z+s/2 ; j+=step){
+      for(double j = z-s; j <= z+s ; j+=step){
          float perlinY = pnoise3d(i*0.2, j*0.2, t, 0.1, 5, 12124);
          glVertex3d(i, y+perlinY, j);
          float perlinY1 = pnoise3d((i+step)*0.2, j*0.2, t, 0.1, 5, 12124);
@@ -278,9 +304,11 @@ static void water(double x,double y,double z,double s){
       glEnd();
    }
 
+   // glDisable(GL_BLEND);
+   // glDepthMask(1);
+   // glDisable(GL_TEXTURE_2D);
+
 }
-
-
 
 
 /*
@@ -288,7 +316,7 @@ static void water(double x,double y,double z,double s){
  *     at (x,y,z)
  *     radius (r)
  */
-static void ball(double x,double y,double z,double r)
+static void ball(double x,double y,double z,double r, int ballColor)
 {
    //  Save transformation
    glPushMatrix();
@@ -299,6 +327,9 @@ static void ball(double x,double y,double z,double r)
    float yellow[]   = {1.0,1.0,0.0,1.0};
    float Emission[] = {0.0,0.0,0.01*emission,1.0};
    glColor3f(1,1,1);
+   if(ballColor){
+      glColor3f(1, 0.5, 0.7);
+   }
    glMaterialf(GL_FRONT,GL_SHININESS,shiny);
    glMaterialfv(GL_FRONT,GL_SPECULAR,yellow);
    glMaterialfv(GL_FRONT,GL_EMISSION,Emission);
@@ -347,85 +378,122 @@ void Normalize(double vect_A[]){
 
 }
 
-
-static void lorenz(double posx, double posy, double posz, int steps, double r){
-   // double x = 10;
-   // double y = 10;
-   // double z = 10;
-   double x = 17.569324;
-   double y = 8.994819;
-   double z = 50.353686;
-   GLdouble transformx = posx - x;
-   GLdouble transformy = posy - y;
-   GLdouble transformz = posz - z;   
-
+/*
+Draw a 1/4 circle tube at x y z
+with R as the curve and tuber as the tube radius
+tubeDegree defines whether its a whole tube or only the bottom part
+rotated ph along the x axis
+rotated th along the y axis
+*/
+static void TubeFunction(double x, double y, double z, double R, double tuber, int tubeDegree, float ph, float th, int tubeColor){
    glPushMatrix();
-   glTranslated(transformx*0.1,transformy*0.1,transformz*0.1);
-   glColor3f(1, 1, 1);
+   glTranslated(x, y, z);
+   glRotatef(th,0,1,0);
+   glRotatef(ph,1,0,0);
 
-   for(int i = 0; i < steps; i++){
-      double dx = dt*s*(y-x);
-      double dy = dt*(x*(r-z)-y);
-      double dz = dt*(x*y - b*z);
-      double x1 = x+dx;
-      double y1 = y+dy;
-      double z1 = z+dz;
-      // derivative for x
-      // x1, y1, z1
-      double dv[] = {dx, dy, dz};
-      Normalize(dv);
-      // x2, y2, z2
-      double gravity[] = {0, -1, 0};
-      //a*b = (y1z2 - z1y2,z1x2 - x1z2,x1y2 - x2y1)
-      double perpendicular[3];
-      CrossProduct(dv, gravity, perpendicular);
-      Normalize(perpendicular);
-      double cross_product[3];
-      CrossProduct(dv, perpendicular, cross_product);
-      Normalize(cross_product);
-      double dot_product = dotProduct(dv, perpendicular);
-
-      // derivative for x1  
-      double dx1 = dt*s*(y1-x1);
-      double dy1 = dt*(x1*(r-z1)-y1);
-      double dz1 = dt*(x1*y1 - b*z1);
-      double dv1[] = {dx1, dy1, dz1};
-      Normalize(dv1);
-      double perpendicular1[3];
-      CrossProduct(dv1, gravity, perpendicular1);
-      Normalize(perpendicular1);
-      double cross_product1[3];
-      CrossProduct(dv1, perpendicular1, cross_product1);
-      Normalize(cross_product1);
-      double dot_product1 = dotProduct(dv1, perpendicular1);
-
-
-
-      glBegin(GL_QUAD_STRIP);
-      for(int j = 0; j > -180; j-=30){
-         double b_rotate[] = 
-         {
-            perpendicular[0]*Cos(j) + cross_product[0]*Sin(j)+dv[0]*dot_product*(1-Cos(j)),
-            perpendicular[1]*Cos(j) + cross_product[1]*Sin(j)+dv[1]*dot_product*(1-Cos(j)),
-            perpendicular[2]*Cos(j) + cross_product[2]*Sin(j)+dv[2]*dot_product*(1-Cos(j)),
-         };
-         glVertex3d(x*0.1+b_rotate[0],y*0.1+b_rotate[1],z*0.1+b_rotate[2]);
-         double b_rotate1[] = 
-         {
-            perpendicular1[0]*Cos(j) + cross_product1[0]*Sin(j)+dv1[0]*dot_product1*(1-Cos(j)),
-            perpendicular1[1]*Cos(j) + cross_product1[1]*Sin(j)+dv1[1]*dot_product1*(1-Cos(j)),
-            perpendicular1[2]*Cos(j) + cross_product1[2]*Sin(j)+dv1[2]*dot_product1*(1-Cos(j)),
-         };
-         glVertex3d(x1*0.1+b_rotate1[0],y1*0.1+b_rotate1[1],z1*0.1+b_rotate1[2]);
-      }
-      glEnd();
-      x = x1;
-      y = y1;
-      z = z1;
+   float tubeColorArray[2][4] = {{1, 1, 1, 1}, {1, 0, 1, 0.3}};
+   if(tubeColor == 1){
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA,GL_ONE);
+      glDepthMask(0);
    }
+   
 
+   glColor4f(tubeColorArray[tubeColor][0], tubeColorArray[tubeColor][1],tubeColorArray[tubeColor][2],tubeColorArray[tubeColor][3]);
+   // inner and outer surface of the tube
+   double resolution = 9;
+   for(int flip = 1; flip < 3; flip ++){
+      // outter loop = 1.4*tuber
+      double localtuber = (1+(flip-1)*0.4)*tuber;
+      for(double i = 0; i < 90; i+= resolution){
+         double tubex = R*Cos(i);
+         double tubey = -R*Sin(i);
+         double dv[] = {tubey, -tubex, 0};
+         Normalize(dv);
+         double perpendicular[] = {0, 0, 1};
+         double cross_product[3];
+         CrossProduct(dv, perpendicular, cross_product);
+         Normalize(cross_product);
+         double dot_product = dotProduct(dv, perpendicular);
 
+         double tubex1 = R*Cos(i+resolution);
+         double tubey1 = -R*Sin(i+resolution);
+         double dv1[] = {tubey1, -tubex1, 0};
+         Normalize(dv1);
+         double cross_product1[3];
+         CrossProduct(dv1, perpendicular, cross_product1);
+         Normalize(cross_product1);
+         double dot_product1 = dotProduct(dv1, perpendicular);
+
+         double normalCalc = 2*flip-3;
+         glBegin(GL_QUAD_STRIP);
+         for(int j = 0; j >= -tubeDegree; j-=30){
+
+            double b_rotate[] = 
+            {
+               perpendicular[0]*Cos(j) + cross_product[0]*Sin(j)+dv[0]*dot_product*(1-Cos(j)),
+               perpendicular[1]*Cos(j) + cross_product[1]*Sin(j)+dv[1]*dot_product*(1-Cos(j)),
+               perpendicular[2]*Cos(j) + cross_product[2]*Sin(j)+dv[2]*dot_product*(1-Cos(j)),
+            };
+
+            glNormal3d(b_rotate[0]*normalCalc,b_rotate[1]*normalCalc,b_rotate[2]*normalCalc);
+            glVertex3d(tubex+b_rotate[0]*localtuber,tubey+b_rotate[1]*localtuber,b_rotate[2]*localtuber);
+
+            double b_rotate1[] = 
+            {
+               perpendicular[0]*Cos(j) + cross_product1[0]*Sin(j)+dv1[0]*dot_product1*(1-Cos(j)),
+               perpendicular[1]*Cos(j) + cross_product1[1]*Sin(j)+dv1[1]*dot_product1*(1-Cos(j)),
+               perpendicular[2]*Cos(j) + cross_product1[2]*Sin(j)+dv1[2]*dot_product1*(1-Cos(j)),
+            };
+            glNormal3d(b_rotate1[0]*normalCalc,b_rotate1[1]*normalCalc,b_rotate1[2]*normalCalc);
+            glVertex3d(tubex1+b_rotate1[0]*localtuber,tubey1+b_rotate1[1]*localtuber,b_rotate1[2]*localtuber);
+         }
+         glEnd();
+      }
+   }
+   if(tubeColor == 0) glColor3f(1, 0.95, 0.509);
+   // side
+   if(tubeDegree != 360){    
+      for (int j = 0; j < 2; j++){
+         glBegin(GL_QUAD_STRIP);
+         for(double i = 0; i <= 90; i+= resolution){
+            double tubex = R*Cos(i);
+            double tubey = -R*Sin(i);
+            glNormal3d(-Cos(i), Sin(i), 0);
+            glVertex3d(tubex, tubey, (j*2-1)*tuber);
+            glVertex3d(tubex, tubey, (j*2-1)*tuber*1.4);
+         }
+         glEnd();
+      }
+   }
+   
+
+   // top and bottom
+   glBegin(GL_QUAD_STRIP);
+   glNormal3d(0, 1, 0);
+   for(int j = 0; j <= tubeDegree; j+=30){
+      glVertex3d(R+tuber*Sin(j), 0, tuber*Cos(j));
+      glVertex3d(R+tuber*Sin(j)*1.4, 0, tuber*Cos(j)*1.4);
+   }
+   glEnd();
+
+   glBegin(GL_QUAD_STRIP);
+   glNormal3d(-1, 0, 0);
+   for(int j = 0; j >= -tubeDegree; j-=30){
+      glVertex3d(0, -R+tuber*Sin(j), tuber*Cos(j));
+      glVertex3d(0, -R+tuber*Sin(j)*1.4, tuber*Cos(j)*1.4);
+   }
+   glEnd();
+
+   // reset the settings
+   if (tubeColor == 1)
+   {
+      glDisable(GL_BLEND);
+      glDepthMask(1);
+      glDisable(GL_TEXTURE_2D);
+   }
    glPopMatrix();
+
 
 }
 
@@ -440,12 +508,14 @@ void drawCar(double x,double y,double z,
             double w,double l,double h,
             double th)
 {
-   // float black[]  = {0.0,0.0,0.0,1.0};
+   //float black[]  = {0.0,0.0,0.0,1.0};
    float red[]  = {1.0,0.0,0.0,1.0};
    // float midred[]  = {1.0,0.4,0.4,1.0};
    float white[]  = {1.0,1.0,1.0,1.0};
    // float yellow[]  = {1.0,1.0,0.0,1.0};
    float Emission[] = {0.01*emission,0.004*emission,0.004*emission,1.0};
+
+
 
    // glColor4fv(red);
    glMaterialfv(GL_FRONT_AND_BACK,GL_EMISSION,Emission);
@@ -464,56 +534,66 @@ void drawCar(double x,double y,double z,
    // wrap around the car
    glColor3f(1, 0, 0);
    calcNormal(-l/2, -h/2, w/2, -l/2, -h/2, -w/2, -5*l/12, 0, w/2);
-   calcTextCord(260, 117); glVertex3f(-l/2, -h/2, -w/2);
-   calcTextCord(501, 117); glVertex3f(-l/2, -h/2, w/2);
-   calcTextCord(491, 54); glVertex3f(-5*l/12, 0, w/2);
-   calcTextCord(270, 54); glVertex3f(-5*l/12, 0, -w/2);
+   glVertex3f(-l/2, -h/2, w/2);
+   glVertex3f(-l/2, -h/2, -w/2);
+   glVertex3f(-5*l/12, 0, -w/2);
+   glVertex3f(-5*l/12, 0, w/2);
+
 
    calcNormal(-5*l/12, 0, w/2, -5*l/12, 0, -w/2, -l/4, 0, w/2);
-   calcTextCord(297, 351); glVertex3f(-5*l/12, 0, -w/2);
-   calcTextCord(297, 234); glVertex3f(-5*l/12, 0, w/2);
-   calcTextCord(244, 234); glVertex3f(-l/4, 0, w/2);
-   calcTextCord(244, 351); glVertex3f(-l/4, 0, -w/2);
+   glVertex3f(-5*l/12, 0, w/2);
+   glVertex3f(-5*l/12, 0, -w/2);
+   glVertex3f(-l/4, 0, -w/2);
+   glVertex3f(-l/4, 0, w/2);
+
+
 
    // （glass color）
    glColor3f(1, 1, 1);
    calcNormal(-l/4, 0, w/2, -l/4, 0, -w/2, -l/6, h/2, w/2);
-   calcTextCord(323, 44); glVertex3f(-l/4, 0, -w/2);
-   calcTextCord(439, 44); glVertex3f(-l/4, 0, w/2);
-   calcTextCord(439, 13); glVertex3f(-l/6, h/2, w/2);
-   calcTextCord(323, 13); glVertex3f(-l/6, h/2, -w/2);
+   glVertex3f(-l/4, 0, w/2);
+   glVertex3f(-l/4, 0, -w/2);
+   glVertex3f(-l/6, h/2, -w/2);
+   glVertex3f(-l/6, h/2, w/2);
+
 
    glColor3f(1, 0, 0);
    calcNormal(-l/6, h/2, w/2, -l/6, h/2, -w/2, l/6, h/2, w/2);
-   calcTextCord(176, 323); glVertex3f(-l/6, h/2, -w/2);
-   calcTextCord(176, 256); glVertex3f(-l/6, h/2, w/2);
-   calcTextCord(114, 256); glVertex3f(l/6, h/2, w/2);
-   calcTextCord(114, 323); glVertex3f(l/6, h/2, -w/2);
+   glVertex3f(-l/6, h/2, w/2);
+   glVertex3f(-l/6, h/2, -w/2);
+   glVertex3f(l/6, h/2, -w/2);
+   glVertex3f(l/6, h/2, w/2);
+
+
 
    calcNormal(l/6, h/2, w/2, l/6, h/2, -w/2, l/4, 0, w/2);
-   calcTextCord(178, 15); glVertex3f(l/6, h/2, -w/2);
-   calcTextCord(69, 15); glVertex3f(l/6, h/2, w/2);
-   calcTextCord(69, 31); glVertex3f(l/4, 0, w/2);
-   calcTextCord(178, 31); glVertex3f(l/4, 0, -w/2);
+   glVertex3f(l/6, h/2, w/2);
+   glVertex3f(l/6, h/2, -w/2);
+   glVertex3f(l/4, 0, -w/2);
+   glVertex3f(l/4, 0, w/2);
 
 
    calcNormal(l/4, 0, w/2, l/4, 0, -w/2, 5*l/12, 0, w/2);
-   calcTextCord(41, 323); glVertex3f(l/4, 0, -w/2);
-   calcTextCord(41, 252); glVertex3f(l/4, 0, w/2);
-   calcTextCord(22, 252); glVertex3f(5*l/12, 0, w/2);
-   calcTextCord(22, 323); glVertex3f(5*l/12, 0, -w/2);
+   glVertex3f(l/4, 0, w/2);
+   glVertex3f(l/4, 0, -w/2);
+   glVertex3f(5*l/12, 0, -w/2);
+   glVertex3f(5*l/12, 0, w/2);
+
 
    calcNormal(5*l/12, 0, w/2, 5*l/12, 0, -w/2, l/2, -h/2, w/2);
-   calcTextCord(230, 46); glVertex3f(5*l/12, 0, -w/2);
-   calcTextCord(14, 46); glVertex3f(5*l/12, 0, w/2);
-   calcTextCord(14, 119); glVertex3f(l/2, -h/2, w/2);
-   calcTextCord(230, 119); glVertex3f(l/2, -h/2, -w/2);
+   glVertex3f(5*l/12, 0, w/2);
+   glVertex3f(5*l/12, 0, -w/2);
+   glVertex3f(l/2, -h/2, -w/2);
+   glVertex3f(l/2, -h/2, w/2);
+
 
    calcNormal(l/2, -h/2, w/2, l/2, -h/2, -w/2, -l/2, -h/2, w/2);
-   calcTextCord(448, 149); glVertex3f(l/2, -h/2, -w/2);
-   calcTextCord(326, 149); glVertex3f(l/2, -h/2, w/2);
-   calcTextCord(326, 404); glVertex3f(-l/2, -h/2, w/2);
-   calcTextCord(448, 404); glVertex3f(-l/2, -h/2, -w/2);
+   glVertex3f(l/2, -h/2, w/2);
+   glVertex3f(l/2, -h/2, -w/2);
+   glVertex3f(-l/2, -h/2, -w/2);
+   glVertex3f(-l/2, -h/2, w/2);
+
+
    glEnd();
 
 
@@ -526,24 +606,23 @@ void drawCar(double x,double y,double z,
       glBegin(GL_QUAD_STRIP);
       glColor3f(1, 0.4, 0.4);
 
-      calcTextCord(357, 456); glVertex3f(-l/2, -h/2, tempW);
-      calcTextCord(357, 424); glVertex3f(-5*l/12, 0, tempW);
+      glVertex3f(-l/2, -h/2, tempW);
+      glVertex3f(-5*l/12, 0, tempW);
       
-      calcTextCord(267, 456); glVertex3f(-l/4, -h/2, tempW);
-      calcTextCord(267, 409); glVertex3f(-l/4, 0, tempW);
+      glVertex3f(-l/4, -h/2, tempW);
+      glVertex3f(-l/4, 0, tempW);
 
-      calcTextCord(210, 456); glVertex3f(-l/6, -h/2, tempW);
-      calcTextCord(210, 383); glVertex3f(-l/6, h/2, tempW);
+      glVertex3f(-l/6, -h/2, tempW);
+      glVertex3f(-l/6, h/2, tempW);
 
-      calcTextCord(131, 456); glVertex3f(l/6, -h/2, tempW);
-      calcTextCord(131, 383); glVertex3f(l/6, h/2, tempW);
+      glVertex3f(l/6, -h/2, tempW);
+      glVertex3f(l/6, h/2, tempW);
 
-      calcTextCord(85, 456); glVertex3f(l/4, -h/2, tempW);
-      calcTextCord(85, 398); glVertex3f(l/4, 0, tempW);
+      glVertex3f(l/4, -h/2, tempW);
+      glVertex3f(l/4, 0, tempW);
 
-      calcTextCord(3, 456); glVertex3f(l/2, -h/2, tempW);
-      calcTextCord(18, 396); glVertex3f(5*l/12, 0, tempW);
-      
+      glVertex3f(l/2, -h/2, tempW);
+      glVertex3f(5*l/12, 0, tempW);
       glEnd();
 
       // draw the other side
@@ -554,36 +633,32 @@ void drawCar(double x,double y,double z,
    // the x and z position of the side face of all wheels
    float const wheelCenter [8][2] = 
    {
-    {l/3, 7*w/12},
-    {l/3, 5*w/12},
-    {l/3, -5*w/12},
-    {l/3, -7*w/12},
-    {-l/3, 7*w/12},
-    {-l/3, 5*w/12},
-    {-l/3, -5*w/12},
-    {-l/3, -7*w/12}
+    {l/4, 7*w/12},
+    {l/4, 5*w/12},
+    {l/4, -5*w/12},
+    {l/4, -7*w/12},
+    {-l/4, 7*w/12},
+    {-l/4, 5*w/12},
+    {-l/4, -5*w/12},
+    {-l/4, -7*w/12}
    };
-   float r = 3*l/24;
-   // wheel hub
+   float r = l/12;
    for (int i = 0; i < 8; i++){
       glBegin(GL_TRIANGLE_FAN);
       glNormal3f(0, 0, 1-i%2*2);
-      calcTextCord(292, 459); glVertex3d(wheelCenter[i][0], -h/2, wheelCenter[i][1]);
-      for (int th=0;th<=360;th+=45){
-         calcTextCord(292 + 28*Cos(th), 459+ 28*Sin(th)); 
+      // check it
+
+      glVertex3d(wheelCenter[i][0], -h/2, wheelCenter[i][1]);
+      for (int th=0;th<=360;th+=45)
          glVertex3d(wheelCenter[i][0]+Cos(th)*r, -h/2+Sin(th)*r,wheelCenter[i][1]);
-      }
       glEnd();
    }
    
-   // tire
    for (int i = 0; i < 8; i+=2){
       glBegin(GL_QUAD_STRIP);
       for (int th=0;th<=360;th+=45){
          glNormal3f(Cos(th), Sin(th), 0);
-         calcTextCord(512, 125+48*th/45);
          glVertex3d(wheelCenter[i][0]+Cos(th)*r, -h/2+Sin(th)*r,wheelCenter[i][1]);
-         calcTextCord(470, 125+48*th/45);
          glVertex3d(wheelCenter[i+1][0]+Cos(th)*r, -h/2+Sin(th)*r,wheelCenter[i+1][1]);
       }
       glNormal3f(1, 0, 0);
@@ -596,6 +671,39 @@ void drawCar(double x,double y,double z,
 
 }
 
+void BallUpdate(){
+   if(bally>=0){
+      ballt += 0.02;
+      float g = 9.8;
+      // g * t * t / 2
+      float distance = g*ballt*ballt/2;
+      bally = 2 - distance;
+      ballx = sqrt(4 - distance * distance);
+   }
+   
+}
+
+void DisplayModel(double x, double y, double z, int model)
+{
+   glPushMatrix();
+   glTranslated(x, y, z);
+   glCallList(myModels[model]);
+   glPopMatrix();
+}
+
+
+void DisplayRocks(int numbers)
+{
+   for (int i = 0; i < numbers; i++){
+      glPushMatrix();
+      glTranslated(rockPosition[i].x, -dim*3, rockPosition[i].z);
+      if (rockPosition[i].style != 3) glScaled(4, 4, 4);
+      glColor3d(0.553, 0.553, 0.56);
+      glCallList(myModels[rockPosition[i].style]);
+      glPopMatrix();
+   }
+   
+}
 
 /*
  *  OpenGL (GLUT) calls this routine to display the scene
@@ -629,7 +737,7 @@ void display()
    float Position[]  = {distance*Cos(zh),ylight,distance*Sin(zh),1.0};
    //  Draw light position as ball (still no lighting here)
    glColor3f(1,1,1);
-   ball(Position[0],Position[1],Position[2] , 0.1);
+   ball(Position[0],Position[1],Position[2] , 0.1, 0);
 
    //  OpenGL should normalize normal vectors
    glEnable(GL_NORMALIZE);
@@ -648,28 +756,40 @@ void display()
    glLightfv(GL_LIGHT0,GL_SPECULAR,Specular);
    glLightfv(GL_LIGHT0,GL_POSITION,Position);
 
-   if (ntex==0)
-      glDisable(GL_TEXTURE_2D);
-   else
-   {
-      glEnable(GL_TEXTURE_2D);
-      glTexEnvi(GL_TEXTURE_ENV , GL_TEXTURE_ENV_MODE , mode?GL_REPLACE:GL_MODULATE);
-      glBindTexture(GL_TEXTURE_2D,myTexture);
+   // count frame
+   Frames ++;
+   GLint t = glutGet(GLUT_ELAPSED_TIME);
+   if (t - T0 >= 1000) {
+      GLfloat seconds = (t - T0) / 1000.0;
+      fps = Frames / seconds;
+      // printf("%d frames in %6.3f seconds = %6.3f FPS\n", Frames, seconds, fps);
+      T0 = t;
+      Frames = 0;
    }
 
+   // update the ball 30 fps
+   if( t - T1 >= 33){
+      T1 = t;
+      BallUpdate();
+   }
+   ball(ballx, bally,0 , 0.2, 1);
+
+
    //  Draw individual objects
-   drawCar(0,-4,0, 1, 2, 1, 0);
+   drawCar(0,0,0, 1, 2, 1, 0);
    Sky(3.5*dim);
+   // draw a water surface as big as the skybox
+   // water(0,-2,0,3.5*dim*2);
+   // for testing transparency
+   // ball(-sqrt(2), 0, -2+sqrt(2), 0.2, 1);
+   DisplayModel(0, 3, 0, 0);
+   DisplayRocks(rockNumbers);
 
-   glDisable(GL_TEXTURE_2D);
-
-   ball(-4,0,0 , 0.5);
-   hotAirBalloon(0,2,0,40);
-   lorenz(0.0, 0.0, 0.0, 20, 0.5);
-   // water(0,0,0,10);
+   hotAirBalloon(2,4.2,0,40);
+   //Tube(double x, double y, double z, int steps, double R, double tuber){
+   TubeFunction(0, 2, 0, 2, 0.2, 180, 0, 0, 0);
+   TubeFunction(0, 0, 2, 2, 0.2, 360, 90, 90, 1);
    
-   
-
    //  Draw axes - no lighting from here on
    glDisable(GL_LIGHTING);
    glDisable(GL_TEXTURE_2D);
@@ -695,9 +815,11 @@ void display()
       Print("Z");
    }
 
+   
    //  Display parameters
    glWindowPos2i(5,45);
-   Print("Texture(T)=%s Mode(M)= %s",ntex?"On":"Off", mode?"Replace":"Modulate", distance,ylight);
+   Print("fps=%6.3f", fps);
+   //Print("Texture(T)=%s Mode(M)= %s",ntex?"On":"Off", mode?"Replace":"Modulate", distance,ylight);
    glWindowPos2i(5,25);
    Print("Ambient(A)=%d  Diffuse(D)=%d Specular(S)=%d Emission(E)=%d Shininess(N)=%.0f",ambient,diffuse,specular,emission,shiny);
 
@@ -780,31 +902,37 @@ void key(unsigned char ch,int x,int y)
       ylight -= 0.1;
    else if (ch==']')
       ylight += 0.1;
-   //  Ambient level
-   else if (ch=='a' && ambient>0)
-      ambient -= 5;
-   else if (ch=='A' && ambient<100)
-      ambient += 5;
-   //  Diffuse level
-   else if (ch=='d' && diffuse>0)
-      diffuse -= 5;
-   else if (ch=='D' && diffuse<100)
-      diffuse += 5;
-   //  Specular level
-   else if (ch=='s' && specular>0)
-      specular -= 5;
-   else if (ch=='S' && specular<100)
-      specular += 5;
-   //  Emission level
-   else if (ch=='e' && emission>0)
-      emission -= 5;
-   else if (ch=='E' && emission<100)
-      emission += 5;
-   //  Shininess level
-   else if (ch=='n' && shininess>-1)
-      shininess -= 1;
-   else if (ch=='N' && shininess<7)
-      shininess += 1;
+   //reset
+   else if (ch=='r'){
+      ballx = bally = 2;
+      ballt = 0;
+   }
+     
+   // //  Ambient level
+   // else if (ch=='a' && ambient>0)
+   //    ambient -= 5;
+   // else if (ch=='A' && ambient<100)
+   //    ambient += 5;
+   // //  Diffuse level
+   // else if (ch=='d' && diffuse>0)
+   //    diffuse -= 5;
+   // else if (ch=='D' && diffuse<100)
+   //    diffuse += 5;
+   // //  Specular level
+   // else if (ch=='s' && specular>0)
+   //    specular -= 5;
+   // else if (ch=='S' && specular<100)
+   //    specular += 5;
+   // //  Emission level
+   // else if (ch=='e' && emission>0)
+   //    emission -= 5;
+   // else if (ch=='E' && emission<100)
+   //    emission += 5;
+   // //  Shininess level
+   // else if (ch=='n' && shininess>-1)
+   //    shininess -= 1;
+   // else if (ch=='N' && shininess<7)
+   //    shininess += 1;
    //  Translate shininess power to value (-1 => 0)
    shiny = shininess<0 ? 0 : pow(2.0,shininess);
    //  Reproject
@@ -850,8 +978,23 @@ int main(int argc,char* argv[])
    glutSpecialFunc(special);
    glutKeyboardFunc(key);
    glutIdleFunc(idle);
-   myTexture = LoadTexBMP("Car.bmp");
-   skyTexture = LoadTexBMP("daylight.bmp");
+   for (int k=0;k<3;k++)
+   {
+      myTexture[k] = LoadTexBMP(textureName[k]);
+   }
+
+   for (int i = 0; i<4; i++){
+      myModels[i] = LoadOBJ(ModelNames[i]);
+   }
+
+   srand(time(0));
+   for (int i = 0; i<rockNumbers; i++){
+      rockPosition[i].x = ((double)rand()) / RAND_MAX * dim * 7 - dim*3.5;
+      rockPosition[i].y = 0;
+      rockPosition[i].z = ((double)rand()) / RAND_MAX * dim * 7 - dim*3.5;
+      rockPosition[i].style = floor(((double)rand()) / RAND_MAX * 3+1);
+   }
+   
    //  Pass control to GLUT so it can interact with the user
    ErrCheck("init");
    glutMainLoop();

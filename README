@@ -1,21 +1,26 @@
-Homework 6 Texture
+Final Project
 Ada Zhao
 
-Key bindings
-  m          Toggles texture mode (Replace / Modulate)
-  t          Toogles texture on/off
-  a/A        Decrease/increase ambient light
-  d/D        Decrease/increase diffuse light
-  s/S        Decrease/increase specular light
-  e/E        Decrease/increase emitted light
-  n/N        Decrease/increase shininess
+# Key bindings
   []         Lower/rise light
   <>         Move light closer/further
+  F          freeze the light
   arrows     Change view angle
   0          Reset view angle
   ESC        Exit
+  r          Reset the ball
 
-Estimated Time
-3.5 hours
 
- 
+# Why I deserve an A
+I looked into implementing perlin noise for the water surface
+(it somehow looks not quite right and I am still working on it)
+I implemented shape, normals, lighting, texture, transparency etc.
+
+# What left to be done
+1. I am exploring a water shader that gives the water reflection and water ripples when the ball falls into water
+2. I will add more elements to the Rob Goldenberg Machine that includes a skeleton animation
+3. I will give the ability to change the view point from outside of the machine to the ball itself
+
+(some minor improvements that need to be done)
+1. I will finish the ball movement. I ended up not being able to implement the collision detection so I will manually calculate the position
+2. I am aware that the water normal is not right
