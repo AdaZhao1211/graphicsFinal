@@ -34,33 +34,35 @@ int one       =   1;  // Unit value
 int distance  =   5;  // Light distance
 int inc       =  10;  // Ball increment
 int local     =   1;  // Local Viewer Model
-int emission  =   0;  // Emission intensity (%)
-int ambient   =  60;  // Ambient intensity (%)
-int diffuse   =  50;  // Diffuse intensity (%)
+int ambient   =  20;  // Ambient intensity (%)
+int diffuse   =  100;  // Diffuse intensity (%)
 int specular  =   10;  // Specular intensity (%)
 int shininess =   0;  // Shininess (power of two)
 float shiny   =   1;  // Shininess (value)
 int zh        =  90;  // Light azimuth
-float ylight  =   0;  // Elevation of light
+float ylight  =   2;  // Elevation of light
 
 int ntex = 1; // texture switch
 double t;
 
-unsigned int myTexture[3];
-char* textureName[] = {"Car.bmp","daylight.bmp","fence.bmp"};
+unsigned int myTexture[4];
+char* textureName[] = {"Car.bmp","daylight.bmp","fence.bmp", "furniturebits_texture.bmp"};
+
 int skyTexture;
+
+// to count fps
 static GLfloat fps = -1;
 static GLint T0 = 0;
 static GLint T1 = 0;
 static GLint Frames = 0;
-
+// variables for the ball animation
 float bally = 2;
 float ballx = 2;
 float ballt = 0;
-
+// load models
 char* ModelNames[] = {"cactus_medium_A.obj", "Rock_1.obj", "Rock_2.obj", "RockPlatforms_2.obj"};
 int myModels[4];
-
+// add rocks
 int rockNumbers = 4;
 typedef struct
 {
@@ -71,8 +73,7 @@ typedef struct
 }  Rock;
 Rock rockPosition[4];
 
-
-
+int myShader;
 /*
  *  Draw vertex in polar coordinates with normal, for Ball()
  */
@@ -134,14 +135,11 @@ void hsvToRgb(double hsv[3], GLfloat rgb[3]) {
  */
 static void hotAirBalloon(double x, double y, double z, double r)
 {
-   float red[]  = {1.0,0.0,0.0,1.0};
    float white[]  = {1.0,1.0,1.0,1.0};
-   float Emission[] = {0.01*emission,0.004*emission,0.004*emission,1.0};
-
-   glMaterialfv(GL_FRONT_AND_BACK,GL_EMISSION,Emission);
-   glMaterialfv(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE,red);
+   float Emission[] = {0.0,0.0,0.0,1.0};
+   glMaterialfv(GL_FRONT,GL_EMISSION,Emission);
    glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR,white);
-   glMaterialf(GL_FRONT_AND_BACK,GL_SHININESS,shiny);
+   glMaterialf(GL_FRONT_AND_BACK,GL_SHININESS,1);
 
    //  Save transformation
    glPushMatrix();
@@ -239,6 +237,8 @@ static void Sky(double D)
    //  Textured white box dimension (-D,+D)
    glPushMatrix();
    glScaled(D,D,D);
+   float Emission[] = {0.0,0.0,0.0,1.0};
+   glMaterialfv(GL_FRONT,GL_EMISSION,Emission);
    glEnable(GL_TEXTURE_2D);
    glColor3f(1,1,1);
 
@@ -265,7 +265,6 @@ static void Sky(double D)
    glTexCoord2f(1.00,0.666); glVertex3f(-1,+1,-1);
    glTexCoord2f(0.75,0.666); glVertex3f(-1,+1,+1);
 
-
    //  Top and bottom
    glTexCoord2f(0.25,0.667); glVertex3f(+1,+1,-1);
    glTexCoord2f(0.5,0.667); glVertex3f(+1,+1,+1);
@@ -282,14 +281,30 @@ static void Sky(double D)
    glDisable(GL_TEXTURE_2D);
    glPopMatrix();
 }
+static void waterTest(double x,double y,double z,double s){
+   glUseProgram(myShader);
+   float Emission[] = {0.0,0.0,0.0,1.0};
+   glMaterialfv(GL_FRONT,GL_EMISSION,Emission);
 
+   glColor3f(0.509,0.914,1);
+
+   double step = s/40;
+   for(double i = x-s; i < x+s; i+=step){
+      glBegin(GL_QUAD_STRIP);
+      for(double j = z-s; j <= z+s ; j+=step){
+         float perlinY = 0;
+         glVertex3d(i, y, j);
+         glVertex3d(i+step, y, j);
+      }
+      glEnd();
+   }
+   glUseProgram(0);
+}
 
 static void water(double x,double y,double z,double s){
-   // glEnable(GL_BLEND);
-   // glBlendFunc(GL_SRC_ALPHA,GL_ONE);
-   // glDepthMask(0);
+   float Emission[] = {0.0,0.0,0.0,1.0};
+   glMaterialfv(GL_FRONT,GL_EMISSION,Emission);
 
-   //glColor4f(0.509,0.914,1, 0.5);
    glColor3f(0.509,0.914,1);
 
    double step = s/40;
@@ -307,7 +322,6 @@ static void water(double x,double y,double z,double s){
    // glDisable(GL_BLEND);
    // glDepthMask(1);
    // glDisable(GL_TEXTURE_2D);
-
 }
 
 
@@ -315,6 +329,7 @@ static void water(double x,double y,double z,double s){
  *  Draw a ball
  *     at (x,y,z)
  *     radius (r)
+ * ballFunction
  */
 static void ball(double x,double y,double z,double r, int ballColor)
 {
@@ -324,14 +339,25 @@ static void ball(double x,double y,double z,double r, int ballColor)
    glTranslated(x,y,z);
    glScaled(r,r,r);
    //  White ball with yellow specular
-   float yellow[]   = {1.0,1.0,0.0,1.0};
-   float Emission[] = {0.0,0.0,0.01*emission,1.0};
+   float white[]   = {1.0,1.0,1.0,1.0};
+   float Emission[] = {0.0,0.0,0.0,1.0};
    glColor3f(1,1,1);
-   if(ballColor){
+   glMaterialf(GL_FRONT,GL_SHININESS,1);
+
+   if(ballColor == 1){
       glColor3f(1, 0.5, 0.7);
+      // Emission[0] = 1;
+      // Emission[1] = 0.5;
+      // Emission[2] = 0.7;
+      glMaterialf(GL_FRONT,GL_SHININESS,8);
+   }else if (ballColor == 2){
+      glColor3f(1, 1, 0);
+      Emission[0] = 1;
+      Emission[1] = 1;
+      Emission[2] = 0;
    }
-   glMaterialf(GL_FRONT,GL_SHININESS,shiny);
-   glMaterialfv(GL_FRONT,GL_SPECULAR,yellow);
+   
+   glMaterialfv(GL_FRONT,GL_SPECULAR,white);
    glMaterialfv(GL_FRONT,GL_EMISSION,Emission);
    //  Bands of latitude
    for (int ph=-90;ph<90;ph+=inc)
@@ -508,18 +534,10 @@ void drawCar(double x,double y,double z,
             double w,double l,double h,
             double th)
 {
-   //float black[]  = {0.0,0.0,0.0,1.0};
    float red[]  = {1.0,0.0,0.0,1.0};
-   // float midred[]  = {1.0,0.4,0.4,1.0};
    float white[]  = {1.0,1.0,1.0,1.0};
-   // float yellow[]  = {1.0,1.0,0.0,1.0};
-   float Emission[] = {0.01*emission,0.004*emission,0.004*emission,1.0};
-
-
-
-   // glColor4fv(red);
-   glMaterialfv(GL_FRONT_AND_BACK,GL_EMISSION,Emission);
-   glMaterialfv(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE,red);
+   float Emission[] = {0.0,0.0,0.0,1.0};
+   glMaterialfv(GL_FRONT,GL_EMISSION,Emission);
    glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR,white);
    glMaterialf(GL_FRONT_AND_BACK,GL_SHININESS,shiny);
 
@@ -539,14 +557,11 @@ void drawCar(double x,double y,double z,
    glVertex3f(-5*l/12, 0, -w/2);
    glVertex3f(-5*l/12, 0, w/2);
 
-
    calcNormal(-5*l/12, 0, w/2, -5*l/12, 0, -w/2, -l/4, 0, w/2);
    glVertex3f(-5*l/12, 0, w/2);
    glVertex3f(-5*l/12, 0, -w/2);
    glVertex3f(-l/4, 0, -w/2);
    glVertex3f(-l/4, 0, w/2);
-
-
 
    // （glass color）
    glColor3f(1, 1, 1);
@@ -556,7 +571,6 @@ void drawCar(double x,double y,double z,
    glVertex3f(-l/6, h/2, -w/2);
    glVertex3f(-l/6, h/2, w/2);
 
-
    glColor3f(1, 0, 0);
    calcNormal(-l/6, h/2, w/2, -l/6, h/2, -w/2, l/6, h/2, w/2);
    glVertex3f(-l/6, h/2, w/2);
@@ -564,14 +578,11 @@ void drawCar(double x,double y,double z,
    glVertex3f(l/6, h/2, -w/2);
    glVertex3f(l/6, h/2, w/2);
 
-
-
    calcNormal(l/6, h/2, w/2, l/6, h/2, -w/2, l/4, 0, w/2);
    glVertex3f(l/6, h/2, w/2);
    glVertex3f(l/6, h/2, -w/2);
    glVertex3f(l/4, 0, -w/2);
    glVertex3f(l/4, 0, w/2);
-
 
    calcNormal(l/4, 0, w/2, l/4, 0, -w/2, 5*l/12, 0, w/2);
    glVertex3f(l/4, 0, w/2);
@@ -579,13 +590,11 @@ void drawCar(double x,double y,double z,
    glVertex3f(5*l/12, 0, -w/2);
    glVertex3f(5*l/12, 0, w/2);
 
-
    calcNormal(5*l/12, 0, w/2, 5*l/12, 0, -w/2, l/2, -h/2, w/2);
    glVertex3f(5*l/12, 0, w/2);
    glVertex3f(5*l/12, 0, -w/2);
    glVertex3f(l/2, -h/2, -w/2);
    glVertex3f(l/2, -h/2, w/2);
-
 
    calcNormal(l/2, -h/2, w/2, l/2, -h/2, -w/2, -l/2, -h/2, w/2);
    glVertex3f(l/2, -h/2, w/2);
@@ -593,9 +602,7 @@ void drawCar(double x,double y,double z,
    glVertex3f(-l/2, -h/2, -w/2);
    glVertex3f(-l/2, -h/2, w/2);
 
-
    glEnd();
-
 
    // side
    float tempW = w/2;
@@ -666,6 +673,10 @@ void drawCar(double x,double y,double z,
       glVertex3d(wheelCenter[i+1][0]+Cos(0)*r, -h/2+Sin(0)*r,wheelCenter[i+1][1]);
       glEnd();
    }
+   ball(-l*5/12, -h/12, w*5/12, w/12, 2);
+   ball(-l*5/12, -h/12, -w*5/12, w/12, 2);
+
+
    //  Undo transformations
    glPopMatrix();
 
@@ -704,6 +715,211 @@ void DisplayRocks(int numbers)
    }
    
 }
+
+// draw a hexagonal column with radius r and height h at x, y, z
+// if the hexagonal is the top layer, it will have some grass on it
+void DrawHexagonal(double x, double y, double z, double r, double h, int top){
+   float lightbrown[]  = {0.91,0.78,0.6};
+   float darkbrown[]  = {0.796,0.58,0.376};
+   float lightgreen[]  = {0.631,0.8,0.227};
+   float darkgreen[]  = {0.039,0.545,0.329};
+   glPushMatrix();
+   glTranslated(x, y, z);
+
+   glBegin(GL_TRIANGLE_FAN);
+   glColor3d(lightbrown[0], lightbrown[1], lightbrown[2]);
+   if(top){
+      glColor3d(lightgreen[0], lightgreen[1], lightgreen[2]);
+   }
+   glNormal3d(0, 1, 0);
+   glVertex3d(0, 0, 0);
+   for (int i = 0; i <= 360; i += 60){
+      glVertex3d(r*Cos(i), 0, r*Sin(i));
+   }
+   glEnd();
+
+   glBegin(GL_TRIANGLE_FAN);
+   glColor3d(darkbrown[0], darkbrown[1], darkbrown[2]);
+   glNormal3d(0, -1, 0);
+   glVertex3d(0, -h, 0);
+   for (int i = 0; i <= 360; i += 60){
+      glVertex3d(r*Cos(i), -h, r*Sin(i));
+   }
+   glEnd();
+
+   if (top){
+      glBegin(GL_QUADS);
+      for (int i = 0; i < 360; i += 60){
+         glNormal3d(Cos(i+30), 0, Sin(i+30));
+         glColor3d(lightbrown[0], lightbrown[1], lightbrown[2]);
+         glVertex3d(r*Cos(i), -h/2, r*Sin(i));
+         glColor3d(darkbrown[0], darkbrown[1], darkbrown[2]);
+         glVertex3d(r*Cos(i), -h, r*Sin(i));
+         glVertex3d(r*Cos(i+60), -h, r*Sin(i+60));
+         glColor3d(lightbrown[0], lightbrown[1], lightbrown[2]);
+         glVertex3d(r*Cos(i+60), -h/2, r*Sin(i+60));
+      }
+      glEnd();
+
+      glBegin(GL_QUADS);
+      for (int i = 0; i < 360; i += 60){
+         glNormal3d(Cos(i+30), 0, Sin(i+30));
+         glColor3d(lightgreen[0], lightgreen[1], lightgreen[2]);
+         glVertex3d(r*Cos(i), 0, r*Sin(i));
+         glColor3d(darkgreen[0], darkgreen[1], darkgreen[2]);
+         glVertex3d(r*Cos(i), -h/2, r*Sin(i));
+         glVertex3d(r*Cos(i+60), -h/2, r*Sin(i+60));
+         glColor3d(lightgreen[0], lightgreen[1], lightgreen[2]);
+         glVertex3d(r*Cos(i+60), 0, r*Sin(i+60));
+      }
+      glEnd();
+
+   }else{
+      glBegin(GL_QUADS);
+      for (int i = 0; i < 360; i += 60){
+         glColor3d(lightbrown[0], lightbrown[1], lightbrown[2]);
+         glNormal3d(Cos(i+30), 0, Sin(i+30));
+         glVertex3d(r*Cos(i), 0, r*Sin(i));
+         glColor3d(darkbrown[0], darkbrown[1], darkbrown[2]);
+         glVertex3d(r*Cos(i), -h, r*Sin(i));
+         glVertex3d(r*Cos(i+60), -h, r*Sin(i+60));
+         glColor3d(lightbrown[0], lightbrown[1], lightbrown[2]);
+         glVertex3d(r*Cos(i+60), 0, r*Sin(i+60));
+      }
+      glEnd();
+
+   }
+   
+   glPopMatrix();
+}
+
+void DrawIsland(double x, double y, double z, double layer, double r, double h){
+
+   for (int i = 0; i < layer; i++){
+      int toplayer = 0;
+      if(i == 0) toplayer = 1;
+      DrawHexagonal(x, y-h*i, z, r, h, toplayer);   
+      int round = layer - i;
+      for (int j = 1; j < round; j++){
+         double angle = 60/j;
+         for (double k = 0; k < 360; k+= angle){
+            int angleShift = j%2;
+            DrawHexagonal(x+Cos(k+angleShift*angle/2)*2*r*j, y-h*i, z+Sin(k+angleShift*angle/2)*2*r*j, r, h, toplayer);
+         }
+      }
+         
+
+   }
+}
+
+
+/*
+ *  Read text file
+ */
+char* ReadText(char *file)
+{
+   char* buffer;
+   //  Open file
+   FILE* f = fopen(file,"rt");
+   if (!f) Fatal("Cannot open text file %s\n",file);
+   //  Seek to end to determine size, then rewind
+   fseek(f,0,SEEK_END);
+   int n = ftell(f);
+   rewind(f);
+   //  Allocate memory for the whole file
+   buffer = (char*)malloc(n+1);
+   if (!buffer) Fatal("Cannot allocate %d bytes for text file %s\n",n+1,file);
+   //  Snarf the file
+   if (fread(buffer,n,1,f)!=1) Fatal("Cannot read %d bytes for text file %s\n",n,file);
+   buffer[n] = 0;
+   //  Close and return
+   fclose(f);
+   return buffer;
+}
+
+
+/*
+ *  Print Shader Log
+ */
+void PrintShaderLog(int obj,char* file)
+{
+   int len=0;
+   glGetShaderiv(obj,GL_INFO_LOG_LENGTH,&len);
+   if (len>1)
+   {
+      int n=0;
+      char* buffer = (char *)malloc(len);
+      if (!buffer) Fatal("Cannot allocate %d bytes of text for shader log\n",len);
+      glGetShaderInfoLog(obj,len,&n,buffer);
+      fprintf(stderr,"%s:\n%s\n",file,buffer);
+      free(buffer);
+   }
+   glGetShaderiv(obj,GL_COMPILE_STATUS,&len);
+   if (!len) Fatal("Error compiling %s\n",file);
+}
+
+/*
+ *  Print Program Log
+ */
+void PrintProgramLog(int obj)
+{
+   int len=0;
+   glGetProgramiv(obj,GL_INFO_LOG_LENGTH,&len);
+   if (len>1)
+   {
+      int n=0;
+      char* buffer = (char *)malloc(len);
+      if (!buffer) Fatal("Cannot allocate %d bytes of text for program log\n",len);
+      glGetProgramInfoLog(obj,len,&n,buffer);
+      fprintf(stderr,"%s\n",buffer);
+   }
+   glGetProgramiv(obj,GL_LINK_STATUS,&len);
+   if (!len) Fatal("Error linking program\n");
+}
+
+/*
+ *  Create Shader
+ */
+int CreateShader(GLenum type,char* file)
+{
+   //  Create the shader
+   int shader = glCreateShader(type);
+   //  Load source code from file
+   char* source = ReadText(file);
+   glShaderSource(shader,1,(const char**)&source,NULL);
+   free(source);
+   //  Compile the shader
+   fprintf(stderr,"Compile %s\n",file);
+   glCompileShader(shader);
+   //  Check for errors
+   PrintShaderLog(shader,file);
+   //  Return name
+   return shader;
+}
+
+/*
+ *  Create Shader Program
+ */
+int CreateShaderProg(char* VertFile,char* FragFile)
+{
+   //  Create program
+   int prog = glCreateProgram();
+   //  Create and compile vertex shader
+   int vert = CreateShader(GL_VERTEX_SHADER,VertFile);
+   //  Create and compile fragment shader
+   int frag = CreateShader(GL_FRAGMENT_SHADER,FragFile);
+   //  Attach vertex shader
+   glAttachShader(prog,vert);
+   //  Attach fragment shader
+   glAttachShader(prog,frag);
+   //  Link program
+   glLinkProgram(prog);
+   //  Check for errors
+   PrintProgramLog(prog);
+   //  Return name
+   return prog;
+}
+
 
 /*
  *  OpenGL (GLUT) calls this routine to display the scene
@@ -772,22 +988,27 @@ void display()
       T1 = t;
       BallUpdate();
    }
-   ball(ballx, bally,0 , 0.2, 1);
+   ball(ballx, bally, 0 , 0.2, 1);
 
 
    //  Draw individual objects
-   drawCar(0,0,0, 1, 2, 1, 0);
+   drawCar(0,2,0, 1, 2, 1, 0);
    Sky(3.5*dim);
    // draw a water surface as big as the skybox
    // water(0,-2,0,3.5*dim*2);
-   // for testing transparency
-   // ball(-sqrt(2), 0, -2+sqrt(2), 0.2, 1);
-   DisplayModel(0, 3, 0, 0);
+   waterTest(0,-5,0,3.5*dim*2);
+
+
+   // display plant
+   DisplayModel(4, 0, 0, 0);
    DisplayRocks(rockNumbers);
 
    hotAirBalloon(2,4.2,0,40);
    //Tube(double x, double y, double z, int steps, double R, double tuber){
    TubeFunction(0, 2, 0, 2, 0.2, 180, 0, 0, 0);
+   DrawIsland(0, 0, 0, 5, 0.5, 0.5);
+
+   // *Transparent* tube
    TubeFunction(0, 0, 2, 2, 0.2, 360, 90, 90, 1);
    
    //  Draw axes - no lighting from here on
@@ -821,7 +1042,7 @@ void display()
    Print("fps=%6.3f", fps);
    //Print("Texture(T)=%s Mode(M)= %s",ntex?"On":"Off", mode?"Replace":"Modulate", distance,ylight);
    glWindowPos2i(5,25);
-   Print("Ambient(A)=%d  Diffuse(D)=%d Specular(S)=%d Emission(E)=%d Shininess(N)=%.0f",ambient,diffuse,specular,emission,shiny);
+   Print("Ambient(A)=%d  Diffuse(D)=%d Specular(S)=%d Shininess(N)=%.0f",ambient,diffuse,specular,shiny);
 
    //  Render the scene and make it visible
    ErrCheck("display");
@@ -978,15 +1199,18 @@ int main(int argc,char* argv[])
    glutSpecialFunc(special);
    glutKeyboardFunc(key);
    glutIdleFunc(idle);
-   for (int k=0;k<3;k++)
+   // load texture
+   for (int k=0;k<4;k++)
    {
       myTexture[k] = LoadTexBMP(textureName[k]);
    }
 
+   // load models
    for (int i = 0; i<4; i++){
       myModels[i] = LoadOBJ(ModelNames[i]);
    }
 
+   // generate random shape and position for the rocks under the water
    srand(time(0));
    for (int i = 0; i<rockNumbers; i++){
       rockPosition[i].x = ((double)rand()) / RAND_MAX * dim * 7 - dim*3.5;
@@ -995,6 +1219,8 @@ int main(int argc,char* argv[])
       rockPosition[i].style = floor(((double)rand()) / RAND_MAX * 3+1);
    }
    
+   myShader = CreateShaderProg("simple.vert","simple.frag");
+
    //  Pass control to GLUT so it can interact with the user
    ErrCheck("init");
    glutMainLoop();
